@@ -10,8 +10,6 @@ function tokenize(command) {
 
     let held = ""
 
-    let type = ""
-
     let flags = {
         singleEscape: false,
         doubleEscape: false
@@ -34,8 +32,37 @@ function tokenize(command) {
                 flags.doubleEscape = !flags.doubleEscape
             }
         }
+        else if (command[i] === "|") {
+            if (flags.doubleEscape || flags.singleEscape) held += command[i]
+            else {
+                if (held !== "") output.push(held)
+                output.push("|")
+                held = ""
+            }
+        }
+        else if (command[i] === ">") {
+            if (flags.doubleEscape || flags.singleEscape) held += command[i]
+            else if (command[i+1] === ">") {
+                if (held !== "") output.push(held)
+                output.push(">>")
+                held = ""
+                i++
+            }
+            else {
+                if (held !== "") output.push(held)
+                held = ""
+            }
+        }
+        else if (command[i] === ";") {
+            if (flags.doubleEscape || flags.singleEscape) held += command[i]
+            else {
+                if (held !== "") output.push(held)
+                output.push(";")
+                held = ""
+            }
+        }
         else if (command[i] === " " && !flags.singleEscape && !flags.doubleEscape) {
-            output.push(held)
+            if (held !== "") output.push(held)
             held = ""
 
         }
@@ -47,6 +74,19 @@ function tokenize(command) {
     if (held !== "") output.push(held)
 
     return output
+}
+
+/**
+ * 
+ * @param {String} text 
+ */
+function extractParams(text) {
+    if (text.startsWith("--")) {
+        return [text.slice(2)]
+    }
+    else if (text[0] === "-") return text.slice(2).split()
+    
+    return []
 }
 
 input.addEventListener("keydown", (e) => {
