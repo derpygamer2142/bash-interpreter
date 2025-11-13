@@ -170,9 +170,7 @@ const COMMANDS = {
 
     info: (stdin, dir, args) => {
         return { stdout: 
-`Hello, and thank you for choosing GOLD OS(tm). We hope you are enjoying your EXPERIENCE(tm) so far.
-This CLI(tm)(Command Line Interface) is fairly unfinished, and is mostly meant as a placeholder until the actual operating system is completed, which, if finished will run completely in a VM.
-Unfortunately this VM is not yet complete, so you are left with this monstrosity of a partial Bash interpreter. This project was made using a custom Turbowarp extension because we here at Gold OS(tm) can't be fucked(tm) implementing this in Scratch.
+`Hello, and thank you for choosing GOLD OS™. We hope you are enjoying your EXPERIENCE™ so far. This CLI™(Command Line Interface) is fairly unfinished, and is mostly meant as a placeholder until the actual operating system is completed, which, if finished will run completely in a VM. Unfortunately this VM is not yet complete, so you are left with this monstrosity of a partial Bash™ interpreter. This Project™ was made using a custom Turbowarp™ extension™ because we here at Gold OS™ can't be fucked™ implementing this in Scratch™.
 For a list of commands, run \`help\`.\n`,
             dir: dir,
             code: 0
@@ -182,18 +180,19 @@ For a list of commands, run \`help\`.\n`,
     help: (stdin, dir, args) => {
         return { stdout: 
 `All listed commands are somewhat compliant with their BusyBox equivalents:
-cat  - Read a file
-echo - Cry out into the void, see if it cries back
-ls   - List entries in a directory
-info - Get information about this OS
-help - This message\n`,
+cat      - Read a file
+echo     - Cry out into the void, see if it cries back
+ls       - List entries in a directory
+info     - Get information about this OS
+help     - This message
+poweroff - POWER OFF YOURSELF, NOW!\n`,
             dir: dir,
             code: 0
         }
     },
 
     poweroff: (stdin, dir, args) => {
-        return { stdout: "", dir: dir, code: 67 }
+        return { stdout: "Powering off...", dir: dir, code: 67 }
     }
 }
 
@@ -311,6 +310,24 @@ function tokenize(command) {
     return output
 }
 
+function textWrapStdout(stdout) {
+
+    /** @type {string[]} */
+    const split = stdout.split("\n")
+    for (let i = 0; i < split.length; i++) {
+        const temp = []
+        for (let j = 0; j < split[i].length; j += 75) {
+            temp.push(split[i].slice(j, j+75))
+        }
+        split.splice(i, 1, ...temp)
+        i += temp.length-1
+    }
+
+    stdout = split.slice(0, split.length-1).join("\n") + "\n" + split[split.length-1] + (stdout[stdout.length-1] === "\n" ? "\n" : "")
+
+    return stdout
+}
+
 function execute(command) {
     let stdin = ""
     let stdout = ""
@@ -398,6 +415,7 @@ function execute(command) {
                             workingDir = result.dir
 
                             exitCode = result.code
+                            if (exitCode === 67) return { stdout: textWrapStdout(sentStdout), code: exitCode }
 
                             if (subcommands[i+1] === "<") i += 2 // already handled
                         }
@@ -416,10 +434,10 @@ function execute(command) {
 
         }
 
-        return { stdout: sentStdout, code: exitCode }
+        return { stdout: textWrapStdout(sentStdout), code: exitCode }
     }
     catch (err) { // couldn't escape from the error; just exit
-        return { stdout: (sentStdout + "\nERROR: " + err?.message ?? "(UNKNOWN)"), code: 1 }
+        return { stdout: textWrapStdout(sentStdout + "\nERROR: " + err?.message ?? "(UNKNOWN)"), code: 1 }
     }
 }
 
