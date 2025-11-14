@@ -21,16 +21,24 @@ class FSFile {
 }
 
 class FSDirectory {
+    /**
+     * 
+     * @param {FSDirectory} parent 
+     * @param {string} name 
+     */
     constructor(parent, name) {
         this.parent = parent
         this.name = name
-        this.children = {}
+        this.children = {
+            ".": this
+        }
+        if (this.parent) this.children[".."] = this.parent
         this.type = "DIR"
 
     }
 
     ls() {
-        return Object.values(this.children)
+        return Object.keys(this.children)
     }
 
     rm() {
@@ -64,8 +72,9 @@ const COMMANDS = {
      */
     cat: (stdin, dir, args) => {
         let stdout = ""
+
         if (args.length < 1) {
-            return { stdout: stdin, dir: dir }
+            return { stdout: stdin, dir: dir, code: 0 }
         }
         else {
             const params = extractAllParams(args)
@@ -76,17 +85,21 @@ const COMMANDS = {
             if (params.includes("e")) params.push("v","E")
             
             
-
-            for (let i = args.findIndex((a) => a[0] !== "-" || a === "-"); i < args.length; i++) {
+            let start = args.findIndex((a) => a[0] !== "-" || a === "-")
+            if (start < 0) {
+                args.push("")
+                start = args.length-1
+            }
+            for (let i = start; i < args.length; i++) {
                 const v = args[i]
-                if (v === "-") {
+                if (v === "-" || v === "") {
                     let temp = stdin
                     if (params.includes("E") || params.includes("show-ends")) temp = temp.replaceAll("\n", "$\n")
                     if (params.includes("n") || params.includes("number")) {
                         const split = temp.split("\n")
                         temp = ""
                         for (let l = 0; l < split.length; l++) {
-                            temp += `${l+1} ${split[l]}`
+                            temp += `${l+1} ${split[l]}\n`
                         }
                     }
                     if (params.includes("s") || params.includes("squeeze-blank")) temp.replaceAll(/\n{3,}/gm, "\n\n") // lazy
@@ -95,7 +108,7 @@ const COMMANDS = {
                 }
                 else {
                     let temp = traversePath(dir, v).content
-                    console.log(params)
+
                     if (params.includes("E") || params.includes("show-ends")) temp = temp.replaceAll("\n", "$\n")
                     if (params.includes("n") || params.includes("number")) {
                         const split = temp.split("\n")
@@ -131,6 +144,7 @@ const COMMANDS = {
         stdout = stdout.join(" ")
         if (!params.includes("n")) stdout += "\n"
 
+        console.log(stdout)
         return { stdout: stdout, dir: dir, code: 0 }
     },
 
@@ -144,21 +158,24 @@ const COMMANDS = {
     ls: (stdin, dir, args) => {
         let stdout = ""
         const params = extractAllParams(args)
-        
+        let start = args.findIndex((a) => a[0] !== "-" || a === "-")
+        if (start < 0) {
+            args.push(".")
+            start = args.length-1
+        }
+
+
         if (args.length < 1) {
-            stdout = dir.ls().map((e) => e.name)
-            if (!params.includes("a") && !params.includes("all")) stdout = stdout.filter((v) => v[0] !== ".")
-            if (!params.includes("B") && !params.includes("ignore-backups")) stdout = stdout.filter((v) => v[0] !== ".")
-            // other options omitted because lazy
+            stdout = dir.ls()
 
             stdout = stdout.join("   ") + "\n"
         }
         else {
-            for (let i = args.findIndex((a) => a[0] !== "-"); i < args.length; i++) {
-                let tempDir = traversePath(dir, args[i]).ls().map((e) => e.name)
-
+            for (let i = start; i < args.length; i++) {
+                let tempDir = traversePath(dir, args[i]).ls()
+                
                 if (!params.includes("a") && !params.includes("all")) tempDir = tempDir.filter((v) => v[0] !== ".")
-                if (!params.includes("B") && !params.includes("ignore-backups")) tempDir = tempDir.filter((v) => v[0] !== ".")
+                if (!params.includes("B") && !params.includes("ignore-backups")) tempDir = tempDir.filter((v) => v[0] !== "~")
                 // other options omitted because lazy
 
                 stdout += tempDir.join("   ") + "\n"
