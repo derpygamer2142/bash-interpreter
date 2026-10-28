@@ -1,3 +1,5 @@
+const VERSION = "0.1.0-beta"
+
 class FSFile {
     constructor(parent, name, content) {
         this.parent = parent
@@ -47,18 +49,51 @@ class FSDirectory {
     }
 
     write(file, content) {
-        this.children[file] = new FSFile(this, file, content)
+        traversePath(this, file, true).content = content
     }
+}
+
+
+/**
+ * 
+ * @param {FSDirectory} dir 
+ * @param {string} path 
+ * @param {boolean} create
+ * 
+ * @returns {FSDirectory | FSFile}
+ */
+function traversePath(dir, path, create) {
+    const split = path.split("/")
+    if (split[0] == "") {
+        dir = VFS
+        split.shift()
+    }
+    for (let i = 0; i < split.length; i++) {
+        const v = split[i]
+        if (v === ".") {} // do nothing
+        else if (v === "..") dir = dir.parent ?? VFS
+        else if (v === "") continue // This is weird, but appears to be standard behavior?
+        else {
+            if (create && i === split.length-1 && !dir.children[v]) {
+                dir.children[v] = new FSFile(dir, v, "")
+                dir = dir.children[v]
+            }
+            else if (dir.children[v]?.type === "DIR" || (i === split.length-1 && dir.children[v]?.type === "FILE")) dir = dir.children[v]
+            else { console.error(split, v, dir); throw new Error(`"${path}": No such file or directory\n`) }
+        }
+    }
+
+    return dir
 }
 
 const VFS = new FSDirectory(null, "")
 let workingDir = VFS
 
 const temp = new FSDirectory(VFS, "somedir")
-temp.write("skibidi.rizz", "only in ohio!!!11!11!")
+temp.write("skibidi.rizz", "only in ohio!!!11!11!\n")
 VFS.children["somedir"] = temp
 
-VFS.write("README.txt", "Hello, world!\nThis is some test text, I hope you enjoy it!")
+VFS.write("README.txt", "Hello, world!\nThis is some test text, I hope you enjoy it!\n")
 
 // a bit of an odd way to store commands, but it works
 
@@ -79,7 +114,7 @@ const COMMANDS = {
         else {
             const params = extractAllParams(args)
 
-            if (params.includes("help")) return { stdout: "Screw you just read the man page https://linux.die.net/man/1/cat", dir: dir, code: 0 }
+            // if (params.includes("help")) return { stdout: "Screw you just read the man page https://linux.die.net/man/1/cat", dir: dir, code: 0 }
 
             if (params.includes("A") || params.includes("show-all")) params.push("v","E","T")
             if (params.includes("e")) params.push("v","E")
@@ -107,7 +142,15 @@ const COMMANDS = {
                     stdout += `${temp}\n`
                 }
                 else {
-                    let temp = traversePath(dir, v).content
+                    let temp;
+                    try {
+                        temp = traversePath(dir, v)
+                    }
+                    catch (error) {
+                        throw error
+                    }
+
+                    temp = temp.content
 
                     if (params.includes("E") || params.includes("show-ends")) temp = temp.replaceAll("\n", "$\n")
                     if (params.includes("n") || params.includes("number")) {
@@ -144,7 +187,6 @@ const COMMANDS = {
         stdout = stdout.join(" ")
         if (!params.includes("n")) stdout += "\n"
 
-        console.log(stdout)
         return { stdout: stdout, dir: dir, code: 0 }
     },
 
@@ -172,7 +214,15 @@ const COMMANDS = {
         }
         else {
             for (let i = start; i < args.length; i++) {
-                let tempDir = traversePath(dir, args[i]).ls()
+                let tempDir; 
+                try {
+                    tempDir = traversePath(dir, args[i])
+                }
+                catch (error) {
+                    throw new Error(`cannot access '${args[i]}': No such file or directory`)
+                }
+
+                tempDir = tempDir.ls()
                 
                 if (!params.includes("a") && !params.includes("all")) tempDir = tempDir.filter((v) => v[0] !== ".")
                 if (!params.includes("B") && !params.includes("ignore-backups")) tempDir = tempDir.filter((v) => v[0] !== "~")
@@ -184,25 +234,33 @@ const COMMANDS = {
 
         return { stdout: stdout, dir: dir, code: 0 }
     },
-
     info: (stdin, dir, args) => {
-        return { stdout: 
-`Hello, and thank you for choosing GOLD OS™. We hope you are enjoying your EXPERIENCE™ so far. This CLI™(Command Line Interface) is fairly unfinished, and is mostly meant as a placeholder until the actual operating system is completed, which, if finished will run completely in a VM. Unfortunately this VM is not yet complete, so you are left with this monstrosity of a partial Bash™ interpreter. This Project™ was made using a custom Turbowarp™ extension™ because we here at Gold OS™ can't be fucked™ implementing this in Scratch™.
-For a list of commands, run \`help\`.\n`,
+        return { stdout:
+`This command is unrelated to its POSIX equivalent.
+This bash interpreter was originally made for GoldOS in OSWars 26. It has been somewhat modified for usability.
+`,
             dir: dir,
             code: 0
+
         }
     },
 
     help: (stdin, dir, args) => {
-        return { stdout: 
-`All listed commands are somewhat compliant with their BusyBox equivalents:
-cat      - Read a file
-echo     - Cry out into the void, see if it cries back
-ls       - List entries in a directory
-info     - Get information about this OS
-help     - This message
-poweroff - POWER OFF YOURSELF, NOW!\n`,
+        return { stdout:
+`Untitled bash, version ${VERSION} (${"navigator" in globalThis ? "js-web" : "js-headless"})
+These shell commands are defined internally.  Type \`help' to see this list.
+Type \`help name' to find out more about the function \`name'.
+Use \`info bash' to find out more about the shell in general.
+Use \`info' to find out more about this shell.
+cat [-e] [-A --show-all] [-v --show-nonprinting] [-E --show-ends] [-T --show-tabs] [-n --number] [-s --squeeze-blank] [FILE]
+cd [directory]
+echo [-neE] [arg ...]
+help
+info
+ls [-a --all] [-B --ignore-backups] [FILE]...
+poweroff
+touch [-c --no-create] [file]
+`,
             dir: dir,
             code: 0
         }
@@ -210,6 +268,33 @@ poweroff - POWER OFF YOURSELF, NOW!\n`,
 
     poweroff: (stdin, dir, args) => {
         return { stdout: "Powering off...", dir: dir, code: 67 }
+    },
+
+    cd: (stdin, dir, args) => {
+        if (args.length > 1) throw new Error("too many arguments");
+        let newdir;
+        try {
+            newdir = traversePath(dir, args[0] ?? "");
+            return { stdout: "", dir: newdir, code: 0 }
+        }
+        catch (error) {
+            throw error
+        }
+    },
+
+    touch: (stdin, dir, args) => {
+        const params = extractAllParams(args)
+        let start = args.findIndex((a) => a[0] !== "-" || a === "-")
+        if (args.length < 1) {
+            throw new Error("missing file operand")
+        }
+        
+
+        for (let i = start; i < args.length; i++) {
+            traversePath(dir, args[i], !(params.includes("c") || params.includes("no-create")))
+        }
+
+        return { stdout: "", dir, code: 0 }
     }
 }
 
@@ -340,6 +425,7 @@ function textWrapStdout(stdout) {
         i += temp.length-1
     }
 
+    if (split.length == 0) return ""
     stdout = split.slice(0, split.length-1).join("\n") + "\n" + split[split.length-1] + (stdout[stdout.length-1] === "\n" ? "\n" : "")
 
     return stdout
@@ -389,7 +475,7 @@ function execute(command) {
                 }
 
                 case ">>": {
-                    workingDir.write(subcommands[i+1][0], (workingDir.children[subcommands[i+1][0]].content ?? "") + stdout)
+                    workingDir.write(subcommands[i+1][0], (traversePath(workingDir, subcommands[i+1][0], true).content ?? "") + stdout)
                     stdout = ""
                     i++
                     break
@@ -408,7 +494,7 @@ function execute(command) {
                 case ";": {
                     // doesn't really matter
                     break
-                } 
+                }
 
                 default: {
                     if (Object.prototype.hasOwnProperty.call(COMMANDS, command[0])) {
@@ -443,7 +529,7 @@ function execute(command) {
 
                     }
                     else {
-                        exitCode = 127
+                        exitCode = 1
                         sentStdout = `${sentStdout}\nUnknown command "${command[0]}"\n`
                     }
                 }
@@ -484,25 +570,5 @@ function extractAllParams(args) {
     return out
 }
 
-/**
- * 
- * @param {FSDirectory} dir 
- * @param {string} path 
- */
-function traversePath(dir, path) {
-    const split = path.split("/")
-    for (let i = 0; i < split.length; i++) {
-        const v = split[i]
-        if (v === ".") {} // do nothing
-        else if (v === "..") dir = dir.parent ?? VFS
-        else {
-            if (dir.children[v]?.type === "DIR" || (i === split.length-1 && dir.children[v]?.type === "FILE")) dir = dir.children[v]
-            else { console.error(split, v, dir); throw new Error(`"${path}": No such file or directory\n`) }
-        }
-    }
 
-    return dir
-}
-
-
-export { execute, VFS as VirtualFileSystem}
+export { execute, VFS as VirtualFileSystem, workingDir as cwd, FSFile, FSDirectory };
